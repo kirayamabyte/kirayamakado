@@ -13,12 +13,14 @@
 
     /* モード選択画面 */
     #modeScreen { justify-content: center; align-items: center; background: radial-gradient(circle, #1a0000 0%, #050000 100%); }
-    .title-logo { font-size: 32px; font-weight: bold; color: #ff3333; text-shadow: 0 0 15px #ff0000; margin-bottom: 25px; letter-spacing: 4px; text-align: center; }
-    .btn-group { display: flex; flex-direction: column; gap: 12px; width: 300px; }
+    .title-logo { font-size: 32px; font-weight: bold; color: #ff3333; text-shadow: 0 0 15px #ff0000; margin-bottom: 20px; letter-spacing: 4px; text-align: center; }
+    .btn-group { display: flex; flex-direction: column; gap: 10px; width: 300px; }
     .btn { padding: 12px; background: #1a232a; border: 1px solid #ff3333; color: #fff; font-weight: bold; font-size: 14px; border-radius: 4px; cursor: pointer; text-align: center; transition: 0.2s; }
     .btn:hover { background: #ff3333; color: #000; box-shadow: 0 0 10px #ff0000; }
+    .btn.cpu-btn { background: #1f3a2b; border-color: #2ecc71; }
+    .btn.cpu-btn:hover { background: #2ecc71; color: #000; box-shadow: 0 0 10px #2ecc71; }
     
-    .rank-box { background: rgba(255, 255, 255, 0.05); border: 1px solid #333; padding: 12px; border-radius: 6px; display: flex; flex-direction: column; gap: 8px; }
+    .rank-box { background: rgba(255, 255, 255, 0.05); border: 1px solid #333; padding: 10px; border-radius: 6px; display: flex; flex-direction: column; gap: 6px; }
     .room-input { padding: 8px; background: #000; border: 1px solid #ff3333; color: #ff8c00; font-weight: bold; text-align: center; border-radius: 4px; font-size: 14px; }
     .input-label { font-size: 11px; color: #aaa; text-align: center; }
 
@@ -50,12 +52,11 @@
     .battle-card { width: 85px; height: 90px; background: #222b35; border: 2px solid #4a5c6e; border-radius: 6px; padding: 5px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; }
     .battle-card.selected { border-color: #ff3333; background: #3d2222; box-shadow: 0 0 10px rgba(255,51,51,0.5); }
 
-    /* 5. カード排出（リザルト）画面 */
+    /* カード排出（リザルト）画面 */
     #rewardScreen { justify-content: center; align-items: center; background: radial-gradient(circle, #1c2630 0%, #090c0f 100%); }
     .result-title { font-size: 28px; font-weight: bold; color: #ffcc00; text-shadow: 0 0 10px #ffaa00; margin-bottom: 20px; }
-    
     .dispenser-container { position: relative; width: 180px; height: 250px; perspective: 1000px; margin-bottom: 25px; }
-    .dispenser-card { width: 100%; height: 100%; background: linear-gradient(135deg, #2b3847 0%, #151c24 100%); border: 3px solid #ffcc00; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; padding: 15px; box-shadow: 0 0 25px rgba(255, 204, 0, 0.4); text-align: center; transform-style: preserve-3d; transition: transform 0.8s; }
+    .dispenser-card { width: 100%; height: 100%; background: linear-gradient(135deg, #2b3847 0%, #151c24 100%); border: 3px solid #ffcc00; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; padding: 15px; box-shadow: 0 0 25px rgba(255, 204, 0, 0.4); text-align: center; }
     .dispenser-card.face-down { background: repeating-linear-gradient(45deg, #1f2937, #1f2937 10px, #111827 10px, #111827 20px); border-color: #4a5c6e; box-shadow: 0 0 10px rgba(0,0,0,0.8); }
     .dispenser-card.face-down * { display: none; }
   </style>
@@ -68,8 +69,12 @@
     <div class="btn-group">
       <div class="btn" onclick="openDeckCustom()">作戦部隊編成</div>
       
+      <!-- CPU対戦ボタン -->
+      <div class="btn cpu-btn" onclick="startCpuBattle()">CPU演習戦 (SOLO)</div>
+
+      <!-- ランクマッチ設定エリア -->
       <div class="rank-box">
-        <div class="input-label">【 部屋番号指定ランクマッチ 】<br>※未入力の場合は全プレイヤーからフリー対戦</div>
+        <div class="input-label">【 部屋番号指定ランクマッチ 】<br>※未入力の場合はフリーランクマッチ</div>
         <input type="text" id="rankRoomInput" class="room-input" placeholder="部屋番号を入力 (任意4桁)" maxlength="4">
         <div class="btn" style="background:#8b0000;" onclick="startRankMatch()">ランクマッチ開始</div>
       </div>
@@ -135,10 +140,8 @@
     <div class="btn" id="claimBtn" style="width: 200px; background: #ff8c00; border-color: #ffaa00;" onclick="revealCard()">カードを排出する</div>
   </div>
 
-  <!-- 外部カードマスターデータの読み込み -->
   <script src="cards-data.js"></script>
 
-  <!-- メインJSロジック -->
   <script>
     let myDeck = { unit: null, tactic: null, weapon: null };
     let activeSlotType = 'units';
@@ -146,6 +149,12 @@
     let units = [], enemies = [];
     let selectedUnit = null, isDragging = false;
     let droppedCard = null;
+
+    // CPU制御パラメータ
+    let isCpuMode = false;
+    let cpuMana = 0;
+    let cpuTimer = 0;
+    let currentCpuConfig = null;
 
     function showScreen(screenId) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -189,7 +198,16 @@
       showScreen('modeScreen');
     }
 
+    // CPU戦の開始設定
+    function startCpuBattle() {
+      isCpuMode = true;
+      currentCpuConfig = CPU_PRESETS[Math.floor(Math.random() * CPU_PRESETS.length)];
+      initBattle();
+    }
+
+    // ランクマッチ開始設定
     function startRankMatch() {
+      isCpuMode = false;
       const roomNum = document.getElementById('rankRoomInput').value.trim();
       const statusEl = document.getElementById('lobbyStatus');
 
@@ -200,7 +218,7 @@
       }
 
       showScreen('lobbyScreen');
-      setTimeout(() => { initBattle(); }, 2500);
+      setTimeout(() => { initBattle(); }, 2000);
     }
 
     function cancelMatching() { showScreen('modeScreen'); }
@@ -235,11 +253,36 @@
       };
       cardDeckUI.appendChild(cardEl);
 
-      enemies = [{ x: canvas.width / 2, y: 80, angle: Math.PI / 2, hp: 120, maxHp: 120 }];
       units = [];
+      enemies = [];
       mana = 0;
+      cpuMana = 0;
+      cpuTimer = 0;
+
+      // 初期の敵ベース機体を1機配置
+      spawnEnemyUnit();
+
       if (battleAnimationId) cancelAnimationFrame(battleAnimationId);
       battleAnimationId = requestAnimationFrame(updateBattle);
+    }
+
+    // CPU用ユニット召喚処理
+    function spawnEnemyUnit() {
+      const uCard = CARD_DATABASE.units.find(u => u.id === (currentCpuConfig?.unitId || 'u1'));
+      const tCard = CARD_DATABASE.tactics.find(t => t.id === (currentCpuConfig?.tacticId || 't1'));
+      const wCard = CARD_DATABASE.weapons.find(w => w.id === (currentCpuConfig?.weaponId || 'w1'));
+
+      let hpVal = uCard.hp * (tCard.effect === 'hp' ? tCard.val : 1.0);
+      let rangeVal = uCard.range * (tCard.effect === 'range' ? tCard.val : 1.0);
+      let atkVal = wCard.atk * (tCard.effect === 'atk' ? tCard.val : 1.0);
+
+      enemies.push({
+        x: canvas.width / 2 + (Math.random() * 120 - 60),
+        y: 80,
+        angle: Math.PI / 2,
+        hp: hpVal, maxHp: hpVal,
+        range: rangeVal, atk: atkVal
+      });
     }
 
     function getPos(e) {
@@ -281,6 +324,51 @@
 
     canvas.addEventListener('pointerup', () => { isDragging = false; });
 
+    // CPU AI（移動・回転・迎撃ロジック）
+    function updateCpuAI() {
+      cpuTimer++;
+      const cooldown = currentCpuConfig?.spawnCooldown || 350;
+      
+      // 時間経過による追加召喚
+      if (cpuTimer > cooldown && enemies.length < 3) {
+        spawnEnemyUnit();
+        cpuTimer = 0;
+      }
+
+      // 敵ユニットの自動進軍およびプレイヤーターゲット旋回
+      enemies.forEach(e => {
+        let targetUnit = null;
+        let minDist = 9999;
+
+        // 一番近い自軍ユニットを探す
+        units.forEach(u => {
+          const d = Math.hypot(u.x - e.x, u.y - e.y);
+          if (d < minDist) {
+            minDist = d;
+            targetUnit = u;
+          }
+        });
+
+        if (targetUnit) {
+          // 自軍ユニットに向かって回転
+          const targetAngle = Math.atan2(targetUnit.y - e.y, targetUnit.x - e.x);
+          e.angle = targetAngle;
+
+          // 射程外なら少しずつ前進
+          if (minDist > e.range * 0.7) {
+            e.x += Math.cos(e.angle) * 0.6;
+            e.y += Math.sin(e.angle) * 0.6;
+          }
+        } else {
+          // ターゲットがいない場合は下方向（自軍陣地）へ前進
+          e.angle = Math.PI / 2;
+          if (e.y < canvas.height - 200) {
+            e.y += 0.3;
+          }
+        }
+      });
+    }
+
     function updateBattle() {
       if (!document.getElementById('battleScreen').classList.contains('active')) return;
 
@@ -288,21 +376,48 @@
       document.getElementById('manaFill').style.width = (mana / 10 * 100) + '%';
       document.getElementById('manaText').textContent = `戦術ゲージ: ${Math.floor(mana)} / 10`;
 
+      // CPU AI の更新実行
+      updateCpuAI();
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
       for (let x = 0; x < canvas.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
       for (let y = 0; y < canvas.height; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
 
+      // 敵（CPU）ユニットの描画と自動攻撃
       enemies.forEach(e => {
-        ctx.fillStyle = '#ff3333';
-        ctx.beginPath(); ctx.arc(e.x, e.y, 18, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#555'; ctx.fillRect(e.x - 20, e.y - 28, 40, 4);
-        ctx.fillStyle = '#ff3333'; ctx.fillRect(e.x - 20, e.y - 28, (e.hp / e.maxHp) * 40, 4);
+        // 敵の射程範囲
+        ctx.fillStyle = 'rgba(255, 51, 51, 0.08)';
+        ctx.beginPath(); ctx.moveTo(e.x, e.y);
+        ctx.arc(e.x, e.y, e.range, e.angle - Math.PI / 6, e.angle + Math.PI / 6);
+        ctx.closePath(); ctx.fill();
+
+        // 敵ユニット本体
+        ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);
+        ctx.fillStyle = '#ff3333'; ctx.fillRect(-14, -14, 28, 28);
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(4, -7); ctx.lineTo(4, 7); ctx.fill();
+        ctx.restore();
+
+        // HPバー
+        ctx.fillStyle = '#555'; ctx.fillRect(e.x - 20, e.y - 25, 40, 4);
+        ctx.fillStyle = '#ff3333'; ctx.fillRect(e.x - 20, e.y - 25, (e.hp / e.maxHp) * 40, 4);
+
+        // 敵から味方への射撃
+        units.forEach(u => {
+          const dist = Math.hypot(u.x - e.x, u.y - e.y);
+          const diff = Math.abs(Math.atan2(u.y - e.y, u.x - e.x) - e.angle);
+          if (dist < e.range && diff < Math.PI / 6) {
+            ctx.strokeStyle = '#ff3333'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(u.x, u.y); ctx.stroke();
+            u.hp -= e.atk;
+          }
+        });
       });
 
+      // 味方ユニットの描画と自動攻撃
       units.forEach(u => {
-        ctx.fillStyle = 'rgba(255, 51, 51, 0.12)';
+        ctx.fillStyle = 'rgba(0, 255, 204, 0.12)';
         ctx.beginPath(); ctx.moveTo(u.x, u.y);
         ctx.arc(u.x, u.y, u.range, u.angle - Math.PI / 6, u.angle + Math.PI / 6);
         ctx.closePath(); ctx.fill();
@@ -326,10 +441,12 @@
         });
       });
 
+      // 死亡判定フィルタ
       enemies = enemies.filter(e => e.hp > 0);
+      units = units.filter(u => u.hp > 0);
 
-      // 敵を撃破して勝利 ➔ カード排出画面へ
-      if (enemies.length === 0) {
+      // 勝利判定
+      if (enemies.length === 0 && cpuTimer > 100) {
         setTimeout(() => { finishMatch(true); }, 500);
         return;
       }
@@ -337,11 +454,8 @@
       battleAnimationId = requestAnimationFrame(updateBattle);
     }
 
-    // マッチ終了＆排出準備
     function finishMatch(isWin) {
       document.getElementById('resultTitle').textContent = isWin ? '作戦成功！ (VICTORY)' : '作戦失敗 (DEFEAT)';
-      
-      // ドロップカードをランダム選出
       droppedCard = REWARD_CARD_POOL[Math.floor(Math.random() * REWARD_CARD_POOL.length)];
       
       const cardEl = document.getElementById('rewardCard');
@@ -354,18 +468,15 @@
       showScreen('rewardScreen');
     }
 
-    // 排出演出
     function revealCard() {
       const cardEl = document.getElementById('rewardCard');
       
-      // 裏返し解除＆表示
       document.getElementById('rewardCategory').textContent = `【 ${droppedCard.category.toUpperCase()} 】`;
       document.getElementById('rewardName').textContent = droppedCard.name;
       document.getElementById('rewardCap').textContent = `CAP: ${droppedCard.cap}`;
       document.getElementById('rewardDesc').textContent = droppedCard.desc;
       cardEl.classList.remove('face-down');
 
-      // 取得カードを所持リスト（CARD_DATABASE）に追加
       const exists = CARD_DATABASE[droppedCard.category].some(c => c.id === droppedCard.id);
       if (!exists) {
         CARD_DATABASE[droppedCard.category].push(droppedCard);
